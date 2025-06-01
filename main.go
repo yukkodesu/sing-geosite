@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -394,7 +395,26 @@ func generate(release *github.RepositoryRelease, output string, cnOutput string,
 }
 
 func setActionOutput(name string, content string) {
-	os.Stdout.WriteString("::set-output name=" + name + "::" + content + "\n")
+	// 获取 GitHub Actions 的输出文件路径
+	outputFile := os.Getenv("GITHUB_OUTPUT")
+	if outputFile == "" {
+		fmt.Println("GITHUB_OUTPUT not set (not running in GitHub Actions?)")
+		return
+	}
+
+	// 写入输出（追加模式）
+	f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	// 格式：key=value（注意换行符）
+	if _, err := fmt.Fprintf(f, "%s=%s\n", name, content); err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("setActionOutput: %s=%s\n", name, content)
 }
 
 func release(source string, destination string, output string, cnOutput string, ruleSetOutput string, ruleSetOutputUnstable string) error {
@@ -417,6 +437,7 @@ func release(source string, destination string, output string, cnOutput string, 
 		return err
 	}
 	setActionOutput("tag", *sourceRelease.Name)
+	println(*sourceRelease.Name)
 	return nil
 }
 
